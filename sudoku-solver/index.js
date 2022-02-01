@@ -1,4 +1,5 @@
 const boardContainer = document.querySelector(".board");
+const timer = document.querySelector(".timer");
 const difficulty = document.querySelector(".difficulty");
 const difficultyEasy = document.querySelector(".difficulty__easy");
 const difficultyMedium = document.querySelector(".difficulty__medium");
@@ -31,9 +32,12 @@ const fillBoardElements = function (board) {
 	} catch (err) {
 		console.log(err);
 	}
+	let start = Date.now();
+	startTimer;
 };
 
 const highlightBoard = function (clickedEl) {
+	// changes the bgcolor of the number on the board which are equal to the clicked value.
 	boardContainer.childNodes.forEach((children) => {
 		children.style.backgroundColor = "";
 		if (clickedEl.value === children.value && clickedEl.value > 0)
@@ -54,12 +58,20 @@ const highlightBoard = function (clickedEl) {
 					boardContainer.childNodes[horizontal].style.color = "red";
 					clickedEl.style.color = "red";
 				}
+				if (boardContainer.childNodes[horizontal].value !== clickedEl.value) {
+					boardContainer.childNodes[horizontal].style.color = "";
+					clickedEl.style.color = "";
+				}
 				if (boardContainer.childNodes[vertical].value === clickedEl.value) {
 					boardContainer.childNodes[vertical].style.color = "red";
 					clickedEl.style.color = "red";
 				}
+				if (boardContainer.childNodes[vertical].value !== clickedEl.value) {
+					boardContainer.childNodes[vertical].style.color = "";
+					clickedEl.style.color = "";
+				}
 
-				//there must be a better way
+				//there must be a better way TODO: refactor
 				for (let row = 0; row < 3; row++) {
 					let columnOffset = index - (index % 3);
 					let centerOffset = columnOffset + row + 9 * (column - rowOffset);
@@ -69,6 +81,10 @@ const highlightBoard = function (clickedEl) {
 							boardContainer.childNodes[centerOffset].style.color = "red";
 							clickedEl.style.color = "red";
 						}
+						if (boardContainer.childNodes[centerOffset].value !== clickedEl.value) {
+							boardContainer.childNodes[centerOffset].style.color = "";
+							clickedEl.style.color = "";
+						}
 					}
 					if (column > 2 && column < 6 && rowOffset > 2 && rowOffset < 6) {
 						boardContainer.childNodes[centerOffset].style.backgroundColor = "#D6EAF8 ";
@@ -76,12 +92,20 @@ const highlightBoard = function (clickedEl) {
 							boardContainer.childNodes[centerOffset].style.color = "red";
 							clickedEl.style.color = "red";
 						}
+						if (boardContainer.childNodes[centerOffset].value !== clickedEl.value) {
+							boardContainer.childNodes[centerOffset].style.color = "";
+							clickedEl.style.color = "";
+						}
 					}
 					if (column > 5 && rowOffset > 5) {
 						boardContainer.childNodes[centerOffset].style.backgroundColor = "#D6EAF8 ";
 						if (boardContainer.childNodes[centerOffset].value === clickedEl.value) {
 							boardContainer.childNodes[centerOffset].style.color = "red";
 							clickedEl.style.color = "red";
+						}
+						if (boardContainer.childNodes[centerOffset].value !== clickedEl.value) {
+							boardContainer.childNodes[centerOffset].style.color = "";
+							clickedEl.style.color = "";
 						}
 					}
 				}
@@ -95,6 +119,22 @@ const clearInputs = function () {
 	let board = localStorage.getItem("board");
 	fillBoardElements(JSON.parse(board));
 };
+
+const startTimer = setInterval(() => {
+	const start = Date.now();
+
+	let timeinSec = (Date.now() - start) / 1000;
+	let sec = Math.floor(timeinSec % 60);
+	let min = Math.floor((timeinSec / 60) % 60);
+	let hour = Math.floor((timeinSec / 3600) % 60);
+
+	let hours = hour > 9 ? "" + hour : "0" + hour;
+	let minutes = min > 9 ? "" + min : "0" + min;
+	let seconds = sec > 9 ? "" + sec : "0" + sec;
+	timer.textContent = hours + ":" + minutes + ":" + seconds;
+}, 1000);
+
+///////////
 
 const init = async function (difficulty) {
 	const board = await fetchBoard(difficulty);
