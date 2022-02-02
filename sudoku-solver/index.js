@@ -1,6 +1,6 @@
 const boardContainer = document.querySelector(".board");
 const timer = document.querySelector(".timer");
-const difficulty = document.querySelector(".difficulty");
+const difficultySelector = document.querySelector(".difficulty");
 const difficultyEasy = document.querySelector(".difficulty__easy");
 const difficultyMedium = document.querySelector(".difficulty__medium");
 const difficultyHard = document.querySelector(".difficulty__hard");
@@ -205,35 +205,44 @@ class Sudoku {
 
 const startGame = new Sudoku();
 
-boardContainer.addEventListener("input", (e) => {
-	const clickedInput = e.target.closest("input");
-	clickedInput.value = [...clickedInput.value.slice(-1)];
-	startGame.highlightBoard(clickedInput);
-});
+const eventHandler = function () {
+	boardContainer.addEventListener("input", () => {
+		const clickedInput = e.target.closest("input");
+		clickedInput.value = [...clickedInput.value.slice(-1)];
+		startGame.highlightBoard(clickedInput);
+	});
 
-boardContainer.addEventListener("click", (e) => {
-	const clickedInput = e.target.closest("input");
-	startGame.clearHighlight();
-	startGame.highlightBoard(clickedInput);
-});
+	boardContainer.addEventListener("click", () => {
+		const clickedInput = e.target.closest("input");
+		startGame.clearHighlight();
+		startGame.highlightBoard(clickedInput);
+	});
 
-difficulty.addEventListener("click", (e) => {
-	if (!e.target.closest("button")) return;
-	const difficulty = e.target.closest("button").textContent.toLowerCase();
-	if (difficulty === "clear") {
-		startGame.clearInputs();
-	} else {
-		startGame.createAndFillBoard(difficulty);
-	}
-	startGame.restartTimer();
-});
+	difficultySelector.addEventListener("click", (e) => {
+		difficultyEasy.classList.remove("height");
+		difficultyMedium.classList.remove("height");
+		difficultyHard.classList.remove("height");
+		if (!e.target.closest("button")) return;
+		const difficulty = e.target.closest("button").textContent.toLowerCase();
+		if (difficulty === "clear") {
+			startGame.clearInputs();
+		} else {
+			startGame.createAndFillBoard(difficulty);
+			e.target.closest("button").classList.toggle("height");
+		}
+		startGame.restartTimer();
+	});
 
-solveBoard.addEventListener("click", async (e) => {
-	const board = await startGame.solveOrValidateBoard("solve");
-	startGame.createAndFillBoard(difficulty, board.solution);
-});
-validateBoard.addEventListener("click", async (e) => {
-	startGame.saveBoardForValidate();
-	const board = await startGame.solveOrValidateBoard("validate");
-	validateStatus.textContent = board.status;
-});
+	solveBoard.addEventListener("click", async () => {
+		const board = await startGame.solveOrValidateBoard("solve");
+		console.log(board);
+		startGame.createAndFillBoard("solve", board.solution);
+	});
+	validateBoard.addEventListener("click", async () => {
+		startGame.saveBoardForValidate();
+		const board = await startGame.solveOrValidateBoard("validate");
+		validateStatus.textContent = board.status;
+		clearInterval(startGame.timer);
+	});
+};
+eventHandler();
