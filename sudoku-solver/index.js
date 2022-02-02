@@ -6,207 +6,234 @@ const difficultyMedium = document.querySelector(".difficulty__medium");
 const difficultyHard = document.querySelector(".difficulty__hard");
 const difficultyRandom = document.querySelector(".difficulty__random");
 const validateBoard = document.querySelector(".validate");
+const validateStatus = document.querySelector(".validate-status");
 const solveBoard = document.querySelector(".solve");
 
-let timerID;
-
-const fetchBoard = async function (difficulty = "random") {
-	try {
-		const res = await fetch(`https://sugoku.herokuapp.com/board?difficulty=${difficulty}`);
-		const data = await res.json();
-		return data.board.flat();
-	} catch (err) {
-		console.log(err);
+class Sudoku {
+	constructor() {
+		this.data;
+		this.createAndFillBoard();
+		this.timer;
+		this.startTimer();
 	}
-};
 
-/////////////////////////////////////////////////////////////////////////
-const fillBoardElements = function (board) {
-	boardContainer.textContent = "";
-	const size = board.length;
-	try {
-		for (let i = 0; i < size; i++) {
-			const inputEl = document.createElement("input");
-			inputEl.setAttribute("type", "number");
-			inputEl.value = `${board[i] === 0 ? "" : board[i]}`;
-			if (board[i] > 0) inputEl.readOnly = true;
-			boardContainer.appendChild(inputEl);
+	startTimer = function () {
+		let start = Date.now();
+		this.timer = setInterval(() => {
+			let timeInSec = (Date.now() - start) / 1000;
+			let sec = Math.floor(timeInSec % 60);
+			let min = Math.floor((timeInSec / 60) % 60);
+			let hour = Math.floor((timeInSec / 3600) % 60);
+
+			let hours = hour > 9 ? "" + hour : "0" + hour;
+			let minutes = min > 9 ? "" + min : "0" + min;
+			let seconds = sec > 9 ? "" + sec : "0" + sec;
+			timer.textContent = hours + ":" + minutes + ":" + seconds;
+		}, 1000);
+	};
+
+	getBoard = async function (difficulty = "random") {
+		try {
+			const res = await fetch(`https://sugoku.herokuapp.com/board?difficulty=${difficulty}`);
+			this.data = await res.json();
+		} catch (err) {
+			console.log(err);
 		}
-	} catch (err) {
-		console.log(err);
-	}
-	startTimer();
-};
+	};
 
-const highlightBoard = function (clickedEl) {
-	// changes the bgcolor of the number on the board which are equal to the clicked input value.
-	boardContainer.childNodes.forEach((children) => {
-		children.style.backgroundColor = "";
-		if (clickedEl.value === children.value && clickedEl.value > 0)
-			children.style.backgroundColor = "#AED6F1";
-	});
+	solveOrValidateBoard = async function (req) {
+		const encodeBoard = (board) =>
+			board.reduce(
+				(result, row, i) =>
+					result + `%5B${encodeURIComponent(row)}%5D${i === board.length - 1 ? "" : "%2C"}`,
+				""
+			);
 
-	boardContainer.childNodes.forEach((children, index) => {
-		if (clickedEl === children) {
-			let width = 9;
-			let columnOffset = index - (index % 9);
-			let rowOffset = Math.floor(index / 9);
-			for (let column = 0; column < width; column++) {
-				let horizontal = columnOffset + column;
-				let vertical = index + 9 * (column - rowOffset);
-				boardContainer.childNodes[horizontal].style.backgroundColor = "#D6EAF8 ";
-				boardContainer.childNodes[vertical].style.backgroundColor = "#D6EAF8 ";
-				if (boardContainer.childNodes[horizontal].value === clickedEl.value) {
-					boardContainer.childNodes[horizontal].style.color = "red";
-					clickedEl.style.color = "red";
-				}
-				if (boardContainer.childNodes[horizontal].value !== clickedEl.value) {
-					boardContainer.childNodes[horizontal].style.color = "";
-					clickedEl.style.color = "";
-				}
-				if (boardContainer.childNodes[vertical].value === clickedEl.value) {
-					boardContainer.childNodes[vertical].style.color = "red";
-					clickedEl.style.color = "red";
-				}
-				if (boardContainer.childNodes[vertical].value !== clickedEl.value) {
-					boardContainer.childNodes[vertical].style.color = "";
-					clickedEl.style.color = "";
-				}
+		const encodeParams = (params) =>
+			Object.keys(params)
+				.map((key) => key + "=" + `%5B${encodeBoard(params[key])}%5D`)
+				.join("&");
 
-				//there must be a better way TODO: refactor
-				for (let row = 0; row < 3; row++) {
-					let columnOffset = index - (index % 3);
-					let centerOffset = columnOffset + row + 9 * (column - rowOffset);
-					if (column < 3 && rowOffset < 3) {
-						boardContainer.childNodes[centerOffset].style.backgroundColor = "#D6EAF8 ";
-						if (boardContainer.childNodes[centerOffset].value === clickedEl.value) {
-							boardContainer.childNodes[centerOffset].style.color = "red";
-							clickedEl.style.color = "red";
+		try {
+			const response = await fetch(
+				`https://sugoku.herokuapp.com/${req === "validate" ? "validate" : "solve"}`,
+				{
+					method: "POST",
+					body:
+						req === "validate"
+							? encodeParams(JSON.parse(localStorage.getItem("solvedBoard")))
+							: encodeParams(this.data),
+					headers: { "Content-Type": "application/x-www-form-urlencoded" },
+				}
+			);
+			const res = await response.json();
+			return res;
+		} catch (err) {
+			console.log(err);
+		}
+	};
+
+	createAndFillBoard = async function (difficulty, b = undefined) {
+		let board = b;
+		if (b === undefined) {
+			await this.getBoard(difficulty);
+			board = this.data.board;
+		}
+		localStorage.setItem("board", JSON.stringify(board));
+		boardContainer.textContent = "";
+		for (let i = 0; i < 9; i++) {
+			for (let j = 0; j < 9; j++) {
+				const input = document.createElement("input");
+				input.setAttribute("type", "number");
+				if ((j + 1) % 3 === 0 && (j + 1) % 9 !== 0)
+					input.style.borderRight = "2px solid rgb(149, 147, 147)";
+				if (i === 2 || i === 5) input.style.borderBottom = "2px solid rgb(149, 147, 147)";
+				input.value = `${board[i][j] === 0 ? "" : board[i][j]}`;
+				if (board[i][j] > 0) input.readOnly = true;
+				boardContainer.appendChild(input);
+			}
+		}
+	};
+
+	highlightBoard = function (clickedInput) {
+		boardContainer.childNodes.forEach((child, index) => {
+			// changes the bgcolor of all numbers on the board which are equal to the clicked input value.
+			if (clickedInput.value === child.value && clickedInput.value > 0)
+				child.style.backgroundColor = "#AED6F1";
+
+			// changes the bgc horizontaly and verticaly
+			if (child === clickedInput) {
+				const columnOffset = index - (index % 9);
+				const rowOffset = Math.floor(index / 9);
+				for (let column = 0; column < 9; column++) {
+					let horizontal = columnOffset + column;
+					let vertical = index + 9 * (column - rowOffset);
+					let horChild = boardContainer.childNodes[horizontal];
+					let verChild = boardContainer.childNodes[vertical];
+					horChild.style.backgroundColor = "#D6EAF8";
+					verChild.style.backgroundColor = "#D6EAF8";
+
+					// if the input value appears verticaly or horizontaly this will change the font color to red
+					horChild.value === clickedInput.value
+						? (horChild.style.color = "#EC7063")
+						: (horChild.style.color = "");
+					horChild.value === clickedInput.value
+						? (clickedInput.style.color = "#EC7063")
+						: (clickedInput.style.color = "");
+					verChild.value === clickedInput.value
+						? (verChild.style.color = "#EC7063")
+						: (verChild.style.color = "");
+					verChild.value === clickedInput.value
+						? (clickedInput.style.color = "#EC7063")
+						: (clickedInput.style.color = "");
+
+					//there must be a better way TODO: refactor
+					// changes the bgc 3x3
+					for (let row = 0; row < 3; row++) {
+						let columnOffset = index - (index % 3);
+						let centerOffset = columnOffset + row + 9 * (column - rowOffset);
+						let centerChild = boardContainer.childNodes[centerOffset];
+						if (column < 3 && rowOffset < 3) {
+							centerChild.style.backgroundColor = "#D6EAF8 ";
+							if (centerChild.value === clickedInput.value) {
+								centerChild.style.color = "red";
+								clickedInput.style.color = "red";
+							}
+							if (centerChild.value !== clickedInput.value) {
+								centerChild.style.color = "";
+								clickedInput.style.color = "";
+							}
 						}
-						if (boardContainer.childNodes[centerOffset].value !== clickedEl.value) {
-							boardContainer.childNodes[centerOffset].style.color = "";
-							clickedEl.style.color = "";
+						if (column > 2 && column < 6 && rowOffset > 2 && rowOffset < 6) {
+							centerChild.style.backgroundColor = "#D6EAF8 ";
+							if (centerChild.value === clickedInput.value) {
+								centerChild.style.color = "red";
+								clickedInput.style.color = "red";
+							}
+							if (centerChild.value !== clickedInput.value) {
+								centerChild.style.color = "";
+								clickedInput.style.color = "";
+							}
 						}
-					}
-					if (column > 2 && column < 6 && rowOffset > 2 && rowOffset < 6) {
-						boardContainer.childNodes[centerOffset].style.backgroundColor = "#D6EAF8 ";
-						if (boardContainer.childNodes[centerOffset].value === clickedEl.value) {
-							boardContainer.childNodes[centerOffset].style.color = "red";
-							clickedEl.style.color = "red";
-						}
-						if (boardContainer.childNodes[centerOffset].value !== clickedEl.value) {
-							boardContainer.childNodes[centerOffset].style.color = "";
-							clickedEl.style.color = "";
-						}
-					}
-					if (column > 5 && rowOffset > 5) {
-						boardContainer.childNodes[centerOffset].style.backgroundColor = "#D6EAF8 ";
-						if (boardContainer.childNodes[centerOffset].value === clickedEl.value) {
-							boardContainer.childNodes[centerOffset].style.color = "red";
-							clickedEl.style.color = "red";
-						}
-						if (boardContainer.childNodes[centerOffset].value !== clickedEl.value) {
-							boardContainer.childNodes[centerOffset].style.color = "";
-							clickedEl.style.color = "";
+						if (column > 5 && rowOffset > 5) {
+							centerChild.style.backgroundColor = "#D6EAF8 ";
+							if (centerChild.value === clickedInput.value) {
+								centerChild.style.color = "red";
+								clickedInput.style.color = "red";
+							}
+							if (centerChild.value !== clickedInput.value) {
+								centerChild.style.color = "";
+								clickedInput.style.color = "";
+							}
 						}
 					}
 				}
 			}
-			children.style.color = "";
-		}
-	});
-};
-
-const clearInputs = function () {
-	let board = localStorage.getItem("board");
-	fillBoardElements(JSON.parse(board));
-};
-
-// TODO: refactor if possible
-const startTimer = function () {
-	const start = Date.now();
-	timerID = setInterval(() => {
-		let timeinSec = (Date.now() - start) / 1000;
-		let sec = Math.floor(timeinSec % 60);
-		let min = Math.floor((timeinSec / 60) % 60);
-		let hour = Math.floor((timeinSec / 3600) % 60);
-
-		let hours = hour > 9 ? "" + hour : "0" + hour;
-		let minutes = min > 9 ? "" + min : "0" + min;
-		let seconds = sec > 9 ? "" + sec : "0" + sec;
-		timer.textContent = hours + ":" + minutes + ":" + seconds;
-	}, 1000);
-};
-
-const data = {
-	board: [],
-};
-let board = JSON.parse(localStorage.getItem("board"));
-for (let i = 0; i < 9; i++) {
-	data.board.push(board.slice(i * 9, i * 9 + 9));
-}
-const encodeBoard = (board) =>
-	board.reduce(
-		(result, row, i) =>
-			result + `%5B${encodeURIComponent(row)}%5D${i === board.length - 1 ? "" : "%2C"}`,
-		""
-	);
-
-const encodeParams = (params) =>
-	Object.keys(params)
-		.map((key) => key + "=" + `%5B${encodeBoard(params[key])}%5D`)
-		.join("&");
-
-const solve = async function () {
-	try {
-		const response = await fetch("https://sugoku.herokuapp.com/solve", {
-			method: "POST",
-			body: encodeParams(data),
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
 		});
-		const res = await response.json();
-		return res.solution.flat();
-	} catch (err) {
-		console.log(err);
-	}
-};
+	};
 
-///////////
-
-const init = async function (difficulty) {
-	const board = await fetchBoard(difficulty);
-	fillBoardElements(board);
-	localStorage.setItem("board", JSON.stringify(board));
-};
-
-const eventHandler = function () {
-	boardContainer.addEventListener("click", (e) => {
-		const clickedEl = e.target.closest("input");
-		highlightBoard(clickedEl);
-	});
-
-	boardContainer.addEventListener("input", (e) => {
-		const inputValue = e.target.closest("input");
-		inputValue.setAttribute("value", inputValue.value);
-		highlightBoard(inputValue);
-	});
-
-	difficulty.addEventListener("click", (e) => {
-		const difficulty = e.target.closest("div").textContent;
-		if (difficulty === "clear") {
-			clearInterval(timerID);
-			clearInputs();
-		} else {
-			clearInterval(timerID);
-			init(difficulty);
+	saveBoardForValidate = function () {
+		let data = {
+			board: [],
+		};
+		let tempBoard = [];
+		boardContainer.childNodes.forEach((child) => {
+			tempBoard.push(child.value);
+		});
+		for (let i = 0; i < 9; i++) {
+			data.board.push(tempBoard.slice(i * 9, i * 9 + 9));
 		}
-	});
-	solveBoard.addEventListener("click", async () => {
-		const boards = await solve();
-		clearInterval(timerID);
-		fillBoardElements(boards);
-	});
-};
+		localStorage.setItem("solvedBoard", JSON.stringify(data));
+	};
 
-init();
-eventHandler();
+	clearHighlight = function () {
+		boardContainer.childNodes.forEach((child) => {
+			child.style.backgroundColor = "";
+		});
+	};
+
+	clearInputs = function () {
+		let board = localStorage.getItem("board");
+		this.createAndFillBoard(difficulty, JSON.parse(board));
+	};
+
+	restartTimer = function () {
+		clearInterval(this.timer);
+		this.startTimer();
+	};
+}
+
+const startGame = new Sudoku();
+
+boardContainer.addEventListener("input", (e) => {
+	const clickedInput = e.target.closest("input");
+	clickedInput.value = [...clickedInput.value.slice(-1)];
+	startGame.highlightBoard(clickedInput);
+});
+
+boardContainer.addEventListener("click", (e) => {
+	const clickedInput = e.target.closest("input");
+	startGame.clearHighlight();
+	startGame.highlightBoard(clickedInput);
+});
+
+difficulty.addEventListener("click", (e) => {
+	if (!e.target.closest("button")) return;
+	const difficulty = e.target.closest("button").textContent.toLowerCase();
+	if (difficulty === "clear") {
+		startGame.clearInputs();
+	} else {
+		startGame.createAndFillBoard(difficulty);
+	}
+	startGame.restartTimer();
+});
+
+solveBoard.addEventListener("click", async (e) => {
+	const board = await startGame.solveOrValidateBoard("solve");
+	startGame.createAndFillBoard(difficulty, board.solution);
+});
+validateBoard.addEventListener("click", async (e) => {
+	startGame.saveBoardForValidate();
+	const board = await startGame.solveOrValidateBoard("validate");
+	validateStatus.textContent = board.status;
+});
