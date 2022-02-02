@@ -8,6 +8,8 @@ const difficultyRandom = document.querySelector(".difficulty__random");
 const validateBoard = document.querySelector(".validate");
 const solveBoard = document.querySelector(".solve");
 
+let timerID;
+
 const fetchBoard = async function (difficulty = "random") {
 	try {
 		const res = await fetch(`https://sugoku.herokuapp.com/board?difficulty=${difficulty}`);
@@ -18,6 +20,7 @@ const fetchBoard = async function (difficulty = "random") {
 	}
 };
 
+/////////////////////////////////////////////////////////////////////////
 const fillBoardElements = function (board) {
 	boardContainer.textContent = "";
 	const size = board.length;
@@ -32,12 +35,11 @@ const fillBoardElements = function (board) {
 	} catch (err) {
 		console.log(err);
 	}
-	let start = Date.now();
-	startTimer;
+	startTimer();
 };
 
 const highlightBoard = function (clickedEl) {
-	// changes the bgcolor of the number on the board which are equal to the clicked value.
+	// changes the bgcolor of the number on the board which are equal to the clicked input value.
 	boardContainer.childNodes.forEach((children) => {
 		children.style.backgroundColor = "";
 		if (clickedEl.value === children.value && clickedEl.value > 0)
@@ -120,19 +122,54 @@ const clearInputs = function () {
 	fillBoardElements(JSON.parse(board));
 };
 
-const startTimer = setInterval(() => {
+// TODO: refactor if possible
+const startTimer = function () {
 	const start = Date.now();
+	timerID = setInterval(() => {
+		let timeinSec = (Date.now() - start) / 1000;
+		let sec = Math.floor(timeinSec % 60);
+		let min = Math.floor((timeinSec / 60) % 60);
+		let hour = Math.floor((timeinSec / 3600) % 60);
 
-	let timeinSec = (Date.now() - start) / 1000;
-	let sec = Math.floor(timeinSec % 60);
-	let min = Math.floor((timeinSec / 60) % 60);
-	let hour = Math.floor((timeinSec / 3600) % 60);
+		let hours = hour > 9 ? "" + hour : "0" + hour;
+		let minutes = min > 9 ? "" + min : "0" + min;
+		let seconds = sec > 9 ? "" + sec : "0" + sec;
+		timer.textContent = hours + ":" + minutes + ":" + seconds;
+	}, 1000);
+};
 
-	let hours = hour > 9 ? "" + hour : "0" + hour;
-	let minutes = min > 9 ? "" + min : "0" + min;
-	let seconds = sec > 9 ? "" + sec : "0" + sec;
-	timer.textContent = hours + ":" + minutes + ":" + seconds;
-}, 1000);
+const data = {
+	board: [],
+};
+let board = JSON.parse(localStorage.getItem("board"));
+for (let i = 0; i < 9; i++) {
+	data.board.push(board.slice(i * 9, i * 9 + 9));
+}
+const encodeBoard = (board) =>
+	board.reduce(
+		(result, row, i) =>
+			result + `%5B${encodeURIComponent(row)}%5D${i === board.length - 1 ? "" : "%2C"}`,
+		""
+	);
+
+const encodeParams = (params) =>
+	Object.keys(params)
+		.map((key) => key + "=" + `%5B${encodeBoard(params[key])}%5D`)
+		.join("&");
+
+const solve = async function () {
+	try {
+		const response = await fetch("https://sugoku.herokuapp.com/solve", {
+			method: "POST",
+			body: encodeParams(data),
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+		});
+		const res = await response.json();
+		return res.solution.flat();
+	} catch (err) {
+		console.log(err);
+	}
+};
 
 ///////////
 
@@ -157,10 +194,17 @@ const eventHandler = function () {
 	difficulty.addEventListener("click", (e) => {
 		const difficulty = e.target.closest("div").textContent;
 		if (difficulty === "clear") {
+			clearInterval(timerID);
 			clearInputs();
 		} else {
+			clearInterval(timerID);
 			init(difficulty);
 		}
+	});
+	solveBoard.addEventListener("click", async () => {
+		const boards = await solve();
+		clearInterval(timerID);
+		fillBoardElements(boards);
 	});
 };
 
