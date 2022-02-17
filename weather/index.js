@@ -1,5 +1,4 @@
 const weather = document.querySelector(".weather");
-const APIKEY = "757467271d43201ef1109733f5cf29df";
 
 class Weather {
 	constructor() {
